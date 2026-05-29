@@ -1,12 +1,17 @@
 ---
 title: "Wrist metric-error summary workbook"
 format: html
-author: Johannes Zauner
+author: 
+  - name: Johannes Zauner
+  - name: Manuel Spitschan
 editor_options:
   chunk_output_type: console
 execute:
   warning: false
   message: false
+citation:
+  type: article
+  doi: 10.5281/zenodo.20450929
 ---
 
 ## Purpose

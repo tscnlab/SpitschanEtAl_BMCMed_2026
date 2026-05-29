@@ -1,0 +1,33 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Supplement to Spitschan & Zauner BMCMed 2026
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Manuel
+    family-names: Spitschan
+    email: manuel.spitschan@tum.de
+    affiliation: >-
+      Technical University of Munich; Max Planck Institute
+      for Biological Cybernetics; TUM Institute for Advanced
+      Study (TUM-IAS)
+    orcid: 'https://orcid.org/0000-0002-8572-9268'
+  - given-names: Johannes
+    family-names: Zauner
+    email: johannes.zauner@tum.de
+    affiliation: Technical University of Munich
+    orcid: 'https://orcid.org/0000-0003-2171-4566'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.20450929.
+    description: Zenodo archive
+repository-code: 'https://github.com/tscnlab/SpitschanEtAl_BMCMed_2026'
+url: >-
+  https://tscnlab.github.io/SpitschanEtAl_BMCMed_2026/metric_summary_wrist
+repository-artifact: 'https://zenodo.org/records/20450929'
+license: CC-BY-4.0
+date-released: '2026-05-28'
