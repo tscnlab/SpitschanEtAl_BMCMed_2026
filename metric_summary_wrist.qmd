@@ -4,6 +4,7 @@ format: html
 author: 
   - name: Johannes Zauner
   - name: Manuel Spitschan
+doi: 10.5281/zenodo.20450929
 editor_options:
   chunk_output_type: console
 execute:
