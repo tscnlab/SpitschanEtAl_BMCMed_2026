@@ -1,0 +1,281 @@
+---
+title: "Wearing_position_figure"
+author: "Johannes Zauner"
+format: 
+  html:
+    self-contained: true
+    code-tools: true
+    code-link: true
+---
+
+## Quarto
+
+This figure pulls together simultaneous light exposure measurements from `glasses`, `chest`, and `wrist` wearing positions, as well as an `environmental` measurement of light exposure from a university rooftop (i.e., unobstructed, horizontal) in the same city as the participant. Data from `Didikoglu et al 2025` ([Github repository](https://github.com/MeLiDosProject/DidikogluEtAl_Dataset_2025)).
+
+## Setup
+
+```{r}
+#| message: false
+library(tidyverse)
+library(gt)
+library(ggdist)
+library(gghighlight)
+library(patchwork)
+library(LightLogR)
+library(legendry)
+library(figpatch)
+library(cowplot)
+#collecting general parameters
+source("https://raw.githubusercontent.com/MeLiDosProject/Data_Metadata_Conventions/main/scripts/general_parameters.R")
+site <- "IZTECH"
+```
+
+### Import light
+
+```{r}
+positions <- c("chest", "glasses", "wrist")
+# URL for the raw RData file on GitHub
+urls <- paste0("https://raw.githubusercontent.com/MeLiDosProject/DidikogluEtAl_Dataset_2025/main/data/imported/light/light_", positions, "_1minute.RData")
+urls <- map(urls, base::url)
+walk(urls, load, envir = globalenv())
+
+#combine light data
+data <- join_datasets(light_wrist_1min, light_glasses_1min, light_chest_1min)
+rm(light_wrist_1min, light_glasses_1min, light_chest_1min)
+```
+
+### Import sleep data & wear log
+
+```{r}
+load(url("https://raw.githubusercontent.com/MeLiDosProject/DidikogluEtAl_Dataset_2025/main/data/imported/continuous/sleepdiaries.RData"))
+load(url("https://raw.githubusercontent.com/MeLiDosProject/DidikogluEtAl_Dataset_2025/main/data/imported/continuous/wearlog.RData"))
+```
+
+### Join sleep-wake-data
+
+```{r}
+sleepdiary <-
+  sleepdiary |> 
+  select(Id, sleep, wake) |> 
+  group_by(Id) |> 
+  pivot_longer(-Id, names_to = "sleep", values_to = "Datetime") |> 
+  sc2interval(Statechange.colname = sleep, starting.state = "wake") |> 
+  sleep_int2Brown(Brown.day = "wake", Brown.evening = "pre-sleep", Brown.night = "sleep") |> 
+  mutate(sleep = case_when(is.na(sleep) & State.Brown == "pre-sleep" ~ "wake", 
+                           .default = sleep))
+
+wearlog <-
+  wearlog |>  select(Id, start, end, wear = state)
+
+data <- 
+data |> 
+  add_states(sleepdiary, start.colname = Interval, end.colname = Interval) |> 
+  add_states(wearlog)
+```
+
+## Visualization
+
+```{r}
+data_reduced <- 
+  data |> 
+  filter(Id == "IZTECH_S015") |> 
+  group_by(Id, position) |>
+  aggregate_Datetime("15 mins") |> 
+  filter_Date(start = "2025-05-02", length = "1 day") |> 
+  group_by(Id) |>
+  mutate(wear = case_when(wear == "off" ~ "non-wear", .default = wear),
+         State.Brown = factor(State.Brown, levels = c("wake", "pre-sleep", "sleep")),
+         position = factor(position, levels = c("glasses", "chest", "wrist"))) |> 
+  add_photoperiod(coordinates[[site]])
+```
+
+```{r}
+fig_path <- function(labels) {
+        paste0("assets/wearables_", labels, ".png")
+}
+```
+
+```{r}
+figs <- 
+  c("glasses","chest", "wrist") |> 
+  map(fig_path) |> 
+  map(fig)
+```
+
+
+```{r}
+Plot1 <-
+ data_reduced |>
+  gg_day(geom = "line", group = position, linewidth = 1) |> 
+  gg_photoperiod() |>
+  gg_states(State.Brown, aes_fill = State.Brown, ymax = -0.1, ymin = -0.4, alpha = 1, on.top = TRUE) |>
+  gg_states(wear, aes_fill = wear, ymax = -0.1, ymin = -0.4, alpha = 1, on.top = TRUE) +
+  scale_fill_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+  labs(fill = "Status") +
+    cowplot::theme_cowplot() +
+  facet_wrap(~position, ncol = 1, strip.position = "left") +
+   gghighlight(use_direct_label = FALSE) +
+   guides(fill = "legend", col = "none") +
+theme(
+  strip.background = element_blank(),
+  strip.placement = "outside",
+        legend.position = "bottom"
+)
+Plot1
+```
+
+```{r}
+ data_reduced |>
+  cut_Datetime(unit = "2 hours", type = "floor", group_by = TRUE) |> 
+  mutate(
+    State.Brown = factor(names(which.max(table(State.Brown, useNA = "ifany")))),
+    State.Brown.cut = interaction(State.Brown, Datetime.rounded),
+         ) |> 
+  filter(position == "chest") |> 
+  gg_day(geom = "line", linewidth = 1) |> 
+  gg_states(State.Brown.cut, aes_fill = State.Brown, ymax = median, 
+            alpha = 1, 
+            extract.metric = 
+              list(
+                median = ~exp_zero_inflated(mean(log_zero_inflated(MEDI))),
+                State.Brown = ~State.Brown
+                )
+            ) |> 
+    gg_photoperiod() +
+  # gg_states(wear, aes_fill = wear, ymax = -0.1, ymin = -0.4, alpha = 1, on.top = TRUE) +
+  scale_fill_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+  labs(fill = "Status") +
+    cowplot::theme_cowplot() +
+  # facet_wrap(~position, ncol = 1, strip.position = "left") +
+   gghighlight(use_direct_label = FALSE) +
+   guides(fill = "legend", col = "none") +
+theme(
+  strip.background = element_blank(),
+  strip.placement = "outside",
+        legend.position = "bottom"
+)
+
+```
+
+
+```{r}
+Plot2 <- 
+data_reduced |> 
+  filter(is.na(wear)) |> 
+  ggplot(aes(x = State.Brown, y = MEDI, fill = State.Brown, col = State.Brown)) +
+  geom_dots(side = "right", binwidth = unit(c(1.25, Inf), "mm"), scale = 0.6,
+            overflow = "keep") +
+  stat_slabinterval(normalize = "xy", side = "topleft",
+                    interval_color = "black",
+                    interval_alpha = 1,
+                    point_alpha = 1,
+                    point_color = "black",
+                    point_fill = "black",
+                    scale = 0.6) +
+  cowplot::theme_cowplot() +
+  scale_y_continuous(trans = "symlog", breaks = c(0, 1, 10, 100)) +
+    scale_fill_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+    scale_color_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+  facet_wrap(~position, ncol = 1, strip.position = "left") +
+  guides(fill = "none", col = "none") +
+  labs(y = "Melanopic EDI (lx)", x = NULL) +
+  theme(strip.background = element_blank(), strip.text = element_blank(),
+        strip.placement = "outside") +
+  coord_cartesian(ylim = c(-0.4, NA))
+
+Plot2
+```
+
+```{r}
+key <- key_range_auto(sep = "\\.")
+
+data_reduced |> 
+  filter(is.na(wear)) |> 
+  ggplot(aes(x = MEDI, y = fct_rev(interaction(position, State.Brown)), fill = State.Brown, col = State.Brown)) +
+  stat_slab(normalize = "xy", side = "topleft",
+                    interval_color = "black",
+                    interval_alpha = 1,
+                    point_alpha = 1,
+                    slab_color = "black",
+                    point_color = "black",
+                    point_fill = "black",
+                    height = 2) +
+  cowplot::theme_cowplot() +
+  scale_x_continuous(trans = "symlog", breaks = c(0, 1, 10, 100)) +
+    scale_fill_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+    scale_color_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+  guides(fill = "none", col = "none", y = primitive_bracket(key = key)) +
+  labs(y = "Melanopic EDI (lx)", x = NULL) +
+  theme(strip.background = element_blank(), strip.text = element_blank(),
+        strip.placement = "outside")
+```
+
+```{r}
+key <- key_range_auto(sep = "\\.")
+
+# Plot3 <- 
+data_reduced |> 
+  filter(is.na(wear)) |> 
+  ggplot(aes(x = interaction(position, State.Brown),y = MEDI, fill = State.Brown, col = State.Brown)) +
+   stat_ccdfinterval(position = "dodge",
+                    interval_color = "black",
+                    interval_alpha = 1,
+                    point_alpha = 1,
+                    point_color = "black",
+                    point_fill = "black") +
+  cowplot::theme_cowplot() +
+  scale_y_continuous(trans = "symlog", breaks = c(0, 1, 10, 100)) +
+    scale_fill_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+    scale_color_manual(values = 
+                      c(wake = "#6A9FB5",
+                        `pre-sleep` = "#FDB863",
+                        sleep = "#2C3E50",  
+                        `non-wear` = "red")) +
+  # facet_wrap(~position, ncol = 1, strip.position = "left") +
+  guides(fill = "none", col = "none", x = primitive_bracket(key = key)) +
+  labs(y = "Melanopic EDI (lx)", x = NULL) +
+  theme(strip.background = element_blank(), strip.text = element_blank(),
+        strip.placement = "outside") +
+  coord_cartesian(ylim = c(-0.4, NA))
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 7
+#| warning: false
+(
+  (Plot1 + Plot2 + 
+     plot_layout(axes = "collect", widths = c(3,2))) |
+    (wrap_plots(figs, ncol = 1))) + 
+  plot_layout(widths = c(5, 1.1))
+ggsave("figures/Figure1.pdf", width = 12, height = 7)
+```
+
