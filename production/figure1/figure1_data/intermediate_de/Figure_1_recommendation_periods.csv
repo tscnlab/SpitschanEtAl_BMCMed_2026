@@ -1,0 +1,5 @@
+"State.Brown","xmin","xmax","xmid","label"
+"night",0,34200,17100,"Sleep"
+"day",34200,72600,53400,"Day"
+"evening",72600,83400,78000,"Pre-bed"
+"night",83400,86400,84900,"Sleep"

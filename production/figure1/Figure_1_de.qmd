@@ -1,0 +1,269 @@
+---
+title: "Abbildung 1: persönliche Lichtexposition und verfügbares Tageslicht"
+lang: de
+engine: knitr
+format: gfm
+execute:
+  echo: true
+  message: false
+  warning: true
+---
+
+This reduced copy of the LightLogR `Day.Rmd` workflow produces only the final
+figure. It retains participant 205, 1 September 2023, the reference alignment,
+five-minute aggregation, diary-based recommendation periods, and symmetric-log
+axis of the original. The changes concern lettering, layout, and the added
+civil-photoperiod strip. This German version translates the visible labels and alt text and omits the caption. All
+measurement data, recommendation thresholds and solar boundaries are unchanged.
+Render with `quarto render Figure_1_de.qmd` from this folder.
+
+The input files are copies of the example data distributed with LightLogR
+0.10.3, originating from the [Guidolin dataset](https://doi.org/10.5281/zenodo.16895188).
+The environmental logger measured unobstructed rooftop daylight in the same city
+and at the same time as the participant, as confirmed by the author.
+
+```{r}
+#| label: setup
+
+library(LightLogR)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(patchwork)
+
+input_dir <- "figure1_data/input"
+data_dir <- "figure1_data/intermediate_de"
+dir.create(data_dir, recursive = TRUE, showWarnings = FALSE)
+timezone <- "Europe/Berlin"
+example_date <- as.Date("2023-09-01")
+day_start <- as_datetime("2023-09-01 00:00:00", tz = timezone)
+day_end <- as_datetime("2023-09-01 23:59:59", tz = timezone)
+input_files <- c(
+  "205_actlumus_Log_1020_20230904101707532.txt.zip",
+  "cyepiamb_CW35_Log_1431_20230904081953614.txt.zip",
+  "205_sleepdiary_all_20230904.csv"
+)
+stopifnot(all(file.exists(file.path(input_dir, input_files))))
+```
+
+Import the original measurements and sleep diary, then align the environmental
+reference and derive the recommendation periods exactly as in the vignette.
+
+```{r}
+#| label: prepare-data
+
+personal <- import$ActLumus(
+  filename = input_files[1], path = input_dir, auto.id = "^(\\d{3})",
+  tz = timezone, auto.plot = FALSE, silent = TRUE
+)
+environment <- import$ActLumus(
+  filename = input_files[2], path = input_dir, manual.id = "CW35",
+  tz = timezone, auto.plot = FALSE, silent = TRUE
+)
+sleep <- import_Statechanges(
+  filename = input_files[3], path = input_dir,
+  Datetime.format = "dmyHM", State.colnames = c("sleep", "offset"),
+  State.encoding = c("sleep", "wake"), Id.colname = record_id,
+  sep = ";", dec = ",", tz = timezone, silent = TRUE
+) |>
+  sc2interval()
+brown_intervals <- sleep |> sleep_int2Brown()
+personal <- personal |>
+  data2reference(Reference.data = environment, across.id = TRUE) |>
+  select(Id, Datetime, MEDI, Reference) |>
+  interval2state(
+    State.interval.dataset = brown_intervals, State.colname = State.Brown
+  ) |>
+  Brown2reference(Brown.rec.colname = Reference.Brown)
+one_day <- personal |> filter_Date(start = example_date, length = days(1))
+figure_data <- one_day |>
+  aggregate_Datetime(unit = "5 mins") |>
+  select(-Reference.Brown) |>
+  Brown2reference(Brown.rec.colname = Reference.Brown) |>
+  filter_Datetime(end = day_end) |>
+  ungroup() |>
+  mutate(
+    time_seconds = as.numeric(hms::as_hms(Datetime)),
+    recommendation_status = factor(
+      if_else(Reference.Brown.check, "Within recommendations", "Outside recommendations"),
+      levels = c("Within recommendations", "Outside recommendations")
+    )
+  )
+stopifnot(
+  n_distinct(figure_data$Id) == 1L,
+  all(as.Date(figure_data$Datetime, tz = timezone) == example_date),
+  !anyNA(figure_data[c("MEDI", "Reference", "Reference.Brown", "State.Brown")]),
+  max(figure_data$Reference, figure_data$MEDI) < 120000
+)
+```
+
+Civil dawn and dusk are calculated at the Tübingen coordinates used in
+LightLogR's [photoperiod vignette](https://tscnlab.github.io/LightLogR/articles/photoperiod.html),
+with a solar depression of 6°. The strip is astronomical context, independent
+of both the measured rooftop curve and the participant's sleep diary.
+
+```{r}
+#| label: civil-photoperiod
+
+coordinates <- c(48.521637, 9.057645)
+solar_times <- extract_photoperiod(one_day, coordinates = coordinates, solarDep = 6)
+stopifnot(nrow(solar_times) == 1L)
+dawn <- as.numeric(hms::as_hms(solar_times$dawn))
+dusk <- as.numeric(hms::as_hms(solar_times$dusk))
+solar_strip_data <- tibble::tibble(
+  xmin = c(0, dawn, dusk), xmax = c(dawn, dusk, 86400),
+  label = c("Civil night", "Civil photoperiod", "Civil night"),
+  fill = c("#003153", "#0073C2", "#003153"),
+  alpha = c(1, 0.25, 1),
+  text_colour = c("white", "#003153", "white")
+) |>
+  mutate(xmid = (xmin + xmax) / 2)
+day_interval <- interval(day_start, day_end, tzone = timezone)
+period_data <- brown_intervals |>
+  filter(int_overlaps(Interval, day_interval)) |>
+  mutate(
+    xmin = pmax(as.numeric(int_start(Interval) - day_start, units = "secs"), 0),
+    xmax = pmin(as.numeric(int_end(Interval) - day_start, units = "secs"), 86400),
+    xmid = (xmin + xmax) / 2,
+    label = case_when(
+      State.Brown == "night" ~ "Sleep",
+      State.Brown == "evening" ~ "Pre-bed",
+      TRUE ~ "Day"
+    )
+  ) |>
+  ungroup()
+```
+
+The graph retains the original blue ribbon between personal exposure and the
+rooftop reference, yellow personal-exposure area, and yellow/grey points for
+recommendation status. The period labels come from the diary; the final short
+sleep interval is left unlabelled to avoid overlap, as in the original.
+
+```{r}
+#| label: build-figure
+
+daylight_blue <- "#0073C2"
+exposure_yellow <- "#EFC000"
+main_plot <- ggplot(figure_data, aes(x = time_seconds, y = MEDI)) +
+  geom_ribbon(
+    aes(ymin = MEDI, ymax = Reference), fill = daylight_blue,
+    colour = daylight_blue, alpha = 0.25, linewidth = 0.3, outline.type = "upper"
+  ) +
+  geom_ribbon(
+    aes(ymin = 0, ymax = MEDI), fill = exposure_yellow,
+    colour = exposure_yellow, alpha = 0.3, linewidth = 0.55, outline.type = "upper"
+  ) +
+  geom_point(aes(colour = recommendation_status), size = 0.85) +
+  geom_line(aes(y = Reference.Brown), colour = "grey40", linetype = 2, linewidth = 0.5) +
+  geom_label(
+    data = filter(period_data, xmax - xmin > 3600),
+    aes(x = xmid, y = 0.3,
+        label = dplyr::recode(
+          label, Sleep = "Schlaf", Day = "Wach", `Pre-bed` = "3h vor Schlaf"
+        )), inherit.aes = FALSE,
+    colour = "grey40", text.colour = "grey30", fill = "white",
+    size = 4, label.padding = grid::unit(0.16, "lines"), linewidth = 0.5
+  ) +
+  scale_colour_manual(values = c(
+    "Within recommendations" = exposure_yellow,
+    "Outside recommendations" = "grey50"
+  )) +
+  scale_x_continuous(
+    breaks = seq(0, 86400, by = 10800),
+    labels = sprintf("%02d:00", seq(0, 24, by = 3)), expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    transform = symlog_trans(), breaks = c(0, 1, 10, 100, 250, 1000, 10000, 100000),
+    labels = c("0", "1", "10", "100", "250", "1.000", "10.000", "100.000")
+  ) +
+  coord_cartesian(xlim = c(0, 86400), ylim = c(0, 120000), expand = FALSE) +
+  labs(x = "Ortszeit (hh:mm)", y = "Melanopische EDI (lx)") +
+  annotate("text", x = 1100, y = 67200, label = "Persönliche Lichtexposition", hjust = 0, size = 4.1) +
+  annotate("point", x = 1600, y = 28800, colour = exposure_yellow, size = 2) +
+  annotate("text", x = 3400, y = 28800, label = "im Zielbereich", hjust = 0, size = 3.7) +
+  annotate("point", x = 1600, y = 11520, colour = "grey50", size = 2) +
+  annotate("text", x = 3400, y = 11520, label = "außerhalb Zielbereich", hjust = 0, size = 3.7) +
+  annotate("text", x = 1100, y = 5000, label = "Tageslichtpotenzial", hjust = 0, size = 4.1, colour = daylight_blue) +
+  annotate("segment", x = 1100, xend = 5200, y = 2200, yend = 2200, linetype = 2, colour = "grey40", linewidth = 0.5) +
+  annotate("text", x = 6400, y = 2200, label = "Brown et al. (2022)", hjust = 0, size = 3.7, colour = "grey30")
+```
+
+```{r}
+#| label: fig-daylight-exposure-de
+#| code-fold: true
+#| code-summary: "Abbildungsgestaltung und Export"
+#| fig-width: 7.0866
+#| fig-height: 4.7244
+#| fig-dpi: 180
+#| fig-alt: "Melanopische äquivalente Tageslichtbeleuchtungsstärke einer teilnehmenden Person an einem beispielhaften Tag, verglichen mit zeitgleichen Messungen des verfügbaren Tageslichts auf einem Dach in derselben Stadt. Die blaue Kurve des Tageslichtpotenzials liegt tagsüber deutlich über den meisten Messwerten der persönlichen Lichtexposition. Die persönliche Exposition unterschreitet tagsüber überwiegend den empfohlenen Mindestwert, überschreitet in den drei Stunden vor dem Schlaf zeitweise den empfohlenen Höchstwert und erfüllt während des Schlafs überwiegend die Empfehlung. Gelbe und graue Punkte kennzeichnen die Exposition innerhalb beziehungsweise außerhalb der Empfehlungen; gestrichelte Linien zeigen die zeitabhängigen Grenzwerte. Ein schmaler unterer Streifen unterscheidet die berechnete Photoperiode einschließlich bürgerlicher Dämmerung in Hellblau von der Nacht in Preußischblau. Die Balken sind direkt beschriftet."
+
+main_plot <- main_plot +
+  guides(colour = "none") +
+  theme_bw(base_size = 12, base_family = "Arial") +
+  theme(
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10.5, colour = "grey20"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(colour = "grey90", linewidth = 0.25),
+    plot.margin = margin(5, 18, 2, 5)
+  )
+solar_strip <- ggplot(solar_strip_data) +
+  geom_rect(aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = 1,
+                fill = fill, alpha = alpha)) +
+  geom_text(aes(x = xmid, y = 0.5, label = dplyr::recode(
+              label, `Civil night` = "Nacht",
+              `Civil photoperiod` = "Tag"
+            ), colour = text_colour),
+            size = 3.6, family = "Arial") +
+  scale_fill_identity() +
+  scale_alpha_identity() +
+  scale_colour_identity() +
+  scale_x_continuous(limits = c(0, 86400), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  theme_void(base_family = "Arial") +
+  theme(plot.margin = margin(0, 18, 4, 5))
+figure_1 <- (main_plot / solar_strip) + plot_layout(heights = c(1, 0.07))
+figure_1
+
+ggsave("Figure_1_de.png", figure_1, width = 180, height = 120, units = "mm",
+       dpi = 600, device = ragg::agg_png, bg = "white")
+ggsave("Figure_1_de.pdf", figure_1, width = 180, height = 120, units = "mm",
+       device = cairo_pdf, family = "Arial", bg = "white")
+```
+
+```{r}
+#| label: export-figure-data
+#| code-fold: true
+#| code-summary: "Prüfung der Plotdaten und Reproduzierbarkeit"
+
+write.csv(figure_data |> mutate(Datetime = format(Datetime, "%Y-%m-%d %H:%M:%S %z")),
+          file.path(data_dir, "Figure_1_profile_data.csv"), row.names = FALSE)
+write.csv(period_data |> select(State.Brown, xmin, xmax, xmid, label),
+          file.path(data_dir, "Figure_1_recommendation_periods.csv"), row.names = FALSE)
+write.csv(solar_strip_data, file.path(data_dir, "Figure_1_civil_strip_data.csv"), row.names = FALSE)
+write.csv(solar_times, file.path(data_dir, "Figure_1_solar_times.csv"), row.names = FALSE)
+# The German labels are applied only while plotting. Keep the canonical data
+# labels in English so every derived value can be checked against the original.
+comparison_files <- c(
+  "Figure_1_profile_data.csv", "Figure_1_recommendation_periods.csv",
+  "Figure_1_civil_strip_data.csv", "Figure_1_solar_times.csv"
+)
+for (filename in comparison_files) {
+  original <- read.csv(file.path("figure1_data/intermediate", filename),
+                       stringsAsFactors = FALSE, check.names = FALSE)
+  translated <- read.csv(file.path(data_dir, filename),
+                         stringsAsFactors = FALSE, check.names = FALSE)
+  stopifnot(identical(original, translated))
+}
+cat("Data check passed: all four derived files are identical to the English figure data.\n")
+writeLines(c(
+  "Source: LightLogR/vignettes/articles/Day.Rmd",
+  "Language: German; translated from Figure_1.qmd",
+  "Render: quarto render Figure_1_de.qmd",
+  paste("Quarto:", system2("quarto", "--version", stdout = TRUE)),
+  "Verification: all four derived CSV files exactly match the English figure data.",
+  "Coordinates: 48.521637 N, 9.057645 E; civil solar depression 6 degrees",
+  "Input MD5 checksums:", capture.output(tools::md5sum(file.path(input_dir, input_files))),
+  "", capture.output(sessionInfo())
+), "Figure_1_de_reproducibility.txt")
+```

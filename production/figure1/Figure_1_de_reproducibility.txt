@@ -1,0 +1,51 @@
+Source: LightLogR/vignettes/articles/Day.Rmd
+Language: German; translated from Figure_1.qmd
+Render: quarto render Figure_1_de.qmd
+Quarto: 1.9.37
+Verification: all four derived CSV files exactly match the English figure data.
+Coordinates: 48.521637 N, 9.057645 E; civil solar depression 6 degrees
+Input MD5 checksums:
+ figure1_data/input/205_actlumus_Log_1020_20230904101707532.txt.zip 
+                                 "200c8faf088211c36ae5c96e4403007e" 
+figure1_data/input/cyepiamb_CW35_Log_1431_20230904081953614.txt.zip 
+                                 "f4f9cc59070ef5ccdca6ef081c98ff23" 
+                 figure1_data/input/205_sleepdiary_all_20230904.csv 
+                                 "934f266b1f3826c4bbc0e0f3ec7b4d67" 
+
+R version 4.6.1 (2026-06-24)
+Platform: aarch64-apple-darwin23
+Running under: macOS Golden Gate 27.0.1
+
+Matrix products: default
+BLAS:   /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRblas.0.dylib 
+LAPACK: /Library/Frameworks/R.framework/Versions/4.6/Resources/lib/libRlapack.dylib;  LAPACK version 3.12.1
+
+locale:
+[1] C.UTF-8/C.UTF-8/C.UTF-8/C/C.UTF-8/C.UTF-8
+
+time zone: Europe/Amsterdam
+tzcode source: internal
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] patchwork_1.3.2  ggplot2_4.0.3    lubridate_1.9.4  dplyr_1.2.1     
+[5] LightLogR_0.10.3
+
+loaded via a namespace (and not attached):
+ [1] generics_0.1.4     tidyr_1.3.2        class_7.3-23       KernSmooth_2.23-26
+ [5] stringi_1.8.7      hms_1.1.3          digest_0.6.39      magrittr_2.0.5    
+ [9] evaluate_1.0.4     grid_4.6.1         timechange_0.3.0   RColorBrewer_1.1-3
+[13] fastmap_1.2.0      jsonlite_2.0.0     e1071_1.7-17       DBI_1.3.0         
+[17] purrr_1.2.2        scales_1.4.0       textshaping_1.0.1  cli_3.6.6         
+[21] rlang_1.3.0        crayon_1.5.3       units_0.8-7        bit64_4.8.2       
+[25] withr_3.0.2        yaml_2.3.12        otel_0.2.0         tools_4.6.1       
+[29] parallel_4.6.1     tzdb_0.5.0         vctrs_0.7.3        R6_2.6.1          
+[33] proxy_0.4-29       lifecycle_1.0.5    classInt_0.4-11    stringr_1.6.0     
+[37] bit_4.6.0          vroom_1.7.1        ragg_1.5.0         pkgconfig_2.0.3   
+[41] pillar_1.11.1      gtable_0.3.6       Rcpp_1.1.1-1.1     glue_1.8.1        
+[45] systemfonts_1.3.1  sf_1.1-2           xfun_0.60          tibble_3.3.1      
+[49] tidyselect_1.2.1   knitr_1.51         farver_2.1.2       htmltools_0.5.9   
+[53] labeling_0.4.3     rmarkdown_2.31     suntools_1.1.0     readr_2.2.0       
+[57] compiler_4.6.1     S7_0.2.2          

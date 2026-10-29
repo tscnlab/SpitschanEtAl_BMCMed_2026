@@ -1,0 +1,7 @@
+CAPTION
+
+Personal light exposure and available daylight during one example day. The yellow profile shows melanopic equivalent daylight illuminance (MEDI) measured for one participant; blue shows simultaneous measurements of unobstructed daylight on a university rooftop in the same city. Points indicate whether personal exposure is within (yellow) or outside (grey) the time-dependent recommendations [4], shown by dashed lines for sleep, daytime and pre-bed periods. The lower strip shows calculated civil photoperiod and civil night (solar elevation threshold −6°). Figure recreated from the Guidolin dataset (https://doi.org/10.5281/zenodo.16895188) following the LightLogR workflow [15]. Abbreviations: lx, lux; MEDI, melanopic equivalent daylight illuminance.
+
+ALT TEXT
+
+One participant's melanopic equivalent daylight illuminance over an example day, compared with simultaneous rooftop measurements of available daylight in the same city. The blue daylight-potential curve is much higher than most personal daytime exposure measurements. Personal exposure is mostly below the recommended daytime minimum, exceeds the evening maximum during part of the pre-bed period, and mostly meets the sleep-period recommendation. Yellow and grey points mark exposure within and outside the recommendations; dashed lines show the time-dependent thresholds. A narrow lower strip distinguishes calculated civil photoperiod in light blue from civil night in Prussian blue, with labels inside the bars.
